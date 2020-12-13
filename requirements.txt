@@ -7,3 +7,5 @@ matplotlib
 coinbase
 pytrends
 sklearn
+tweepy
+tqdm
