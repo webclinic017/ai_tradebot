@@ -1,6 +1,9 @@
 tensorflow
+tensorflow_hub
+tensorflow_text
 pandas
 numpy
 matplotlib
 coinbase
 pytrends
+sklearn
