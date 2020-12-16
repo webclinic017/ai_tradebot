@@ -32,20 +32,28 @@ TODO:
 class BERT:
     def load_data(self, data=None):
         def _map_func(text, labels):
-            labels_enc = []
+            # labels_enc = []
+            i=0
+            labels_enc = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
             for label in labels:
                 if label=='negative':
-                    label = -1
+                    label = tf.constant(-1)
                 elif label=='neutral':
-                    label = 0
+                    label = tf.constant(0)
                 else: 
-                    label = 1
+                    label = tf.constant(1)
 
                 label = tf.one_hot(
-                    label, 3, name='label', axis=-1
-                )
+                    label, 3, name='label', axis=-1)
 
-                labels_enc.append(label)
+                labels_enc.write(i, label)
+                i = i+1
+
+            # labels_enc_out = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+            
+            # for label in labels_enc:
+            #     labels_enc_out.write(i, label)
+                
 
             return text, labels_enc
 
@@ -65,33 +73,19 @@ class BERT:
             label_name='sentiment', header=True
         )
 
-        train_ds = raw_train_ds.cache().prefetch(buffer_size=AUTOTUNE)
+        train_ds = raw_train_ds.prefetch(buffer_size=AUTOTUNE)
 
         train_ds = train_ds.map(_map_func)
 
         for line in train_ds.take(1):
-            print(f"THE TYPE OF THE LABELS LIST: {type(line[1])}")
-            labels = []
-            for label in line[1]:
-                if label=='negative':
-                    label = -1
-                elif label=='neutral':
-                    label = 0
-                else: 
-                    label = 1
-
-                label = tf.one_hot(
-                    label, 3, name='label', axis=-1
-                )
-
-                labels.append(label)
+            print(f"THE LABELS LIST: {line[1]}")
 
         classifier_model = model()
 
         loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
         metrics = tf.metrics.BinaryAccuracy()
 
-        print(tf.data.experimental.cardinality(train_ds).numpy())
+        print(f"DATA CARDINALITY: {tf.data.experimental.cardinality(train_ds).numpy()}")
 
         epochs = 5
         steps_per_epoch = tf.data.experimental.cardinality(train_ds).numpy()
