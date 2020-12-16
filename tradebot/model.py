@@ -9,7 +9,7 @@ from tradebot.news import Twitter_News
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
-import transformers
+from official.nlp import optimization
 
 tf.get_logger().setLevel('ERROR')
 
@@ -32,7 +32,6 @@ TODO:
 class BERT:
     def load_data(self, data=None):
         def _map_func(text, labels):
-            # labels_enc = []
             i=0
             labels_enc = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
             for label in labels:
@@ -49,19 +48,13 @@ class BERT:
                 labels_enc.write(i, label)
                 i = i+1
 
-            # labels_enc_out = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-            
-            # for label in labels_enc:
-            #     labels_enc_out.write(i, label)
-                
-
             return text, labels_enc
 
         def model():
             text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text')
             preprocessing_layer = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_preprocess/2', name='preprocessing')
             encoder_inputs = preprocessing_layer(text_input)
-            encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_preprocess/2', trainable=False, name='BERT_encoder')
+            encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/3', trainable=False, name='BERT_encoder')
             outputs = encoder(encoder_inputs)
             net = outputs['pooled_output']
             net = tf.keras.layers.Dropout(0.1)(net)
@@ -104,7 +97,7 @@ class BERT:
 
         classifier_model.fit(x=train_ds,
                              validation_data=train_ds.skip(3000),
-                             epochs=epochs)
+                             epochs=10)
 
         classifier_model.save('./models/fin_sentiment_bert', include_optimizer=False)
 
