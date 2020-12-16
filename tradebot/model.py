@@ -1,68 +1,119 @@
 import tensorflow as tf
 import tensorflow_hub as hub
 import tensorflow_text as text
-from sklearn.preprocessing import OneHotEncoder
 import numpy as np
 import pandas as pd
 import os
 from pytrends.request import TrendReq
 from tradebot.news import Twitter_News
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+import transformers
 
-BATCH_SIZE = 12
-EPOCHS = 10
+tf.get_logger().setLevel('ERROR')
+
+BATCH_SIZE = 64
+AUTOTUNE = tf.data.experimental.AUTOTUNE
+
 KEYWORD_LIST = ["Blockchain", "Bitcoin", "Ethereum", "Cryptocurreny"]
 
+"""
+TODO:
+- Build input pipeline
+    - [x] read dataset from csv
+    - [ ] preprocess labels
+
+- build bert model
+    - [ ] preprocess inputs
+    - [ ] train bert & cassifier
+"""
+
 class BERT:
-    def __init__(self):
-        self.preprocess = hub.load('https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/1')
-        self.encoder = hub.load('https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-2_H-128_A-2/1')
+    def load_data(self, data=None):
+        def _map_func(text, labels):
+            labels_enc = []
+            for label in labels:
+                if label=='negative':
+                    label = -1
+                elif label=='neutral':
+                    label = 0
+                else: 
+                    label = 1
 
-        self.sentiment = tf.keras.models.Sequential()
-        self.sentiment.add(tf.keras.layers.Dense(64, input_shape=(128,), activation='relu'))
-        self.sentiment.add(tf.keras.layers.Dense(64, activation='relu'))
-        self.sentiment.add(tf.keras.layers.Dropout(0.2))
-        self.sentiment.add(tf.keras.layers.Dense(32, input_shape=(128,), activation='relu'))
-        self.sentiment.add(tf.keras.layers.Dense(32, activation='relu'))
-        self.sentiment.add(tf.keras.layers.Dropout(0.2))
-        # self.sentiment.add(tf.keras.layers.Dense(1, activation='sigmoid'))
-        self.sentiment.add(tf.keras.layers.Dense(3, activation='sigmoid'))
+                label = tf.one_hot(
+                    label, 3, name='label', axis=-1
+                )
 
-        self.sentiment.compile(loss='BinaryCrossentropy', 
-                               optimizer=tf.keras.optimizers.Adam(1e-2), 
-                               metrics=['acc'])
+                labels_enc.append(label)
 
-        if not os.listdir(path='./models'):
-            self.train()
-        else:
-            self.load()
+            return text, labels_enc
 
-    def load_data(self):
-        df = pd.read_csv('./data/finanical_news_sentiment.csv')
-        labels = OneHotEncoder(sparse=False).fit_transform(df['score'].to_numpy().reshape(-1, 1))
+        def model():
+            text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text')
+            preprocessing_layer = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_preprocess/2', name='preprocessing')
+            encoder_inputs = preprocessing_layer(text_input)
+            encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_preprocess/2', trainable=False, name='BERT_encoder')
+            outputs = encoder(encoder_inputs)
+            net = outputs['pooled_output']
+            net = tf.keras.layers.Dropout(0.1)(net)
+            net = tf.keras.layers.Dense(3, activation='sigmoid', name='classifier')(net)
+            return tf.keras.Model(text_input, net)
 
-        return df['text'].to_numpy(), labels
+        raw_train_ds = tf.data.experimental.make_csv_dataset(
+            './data/sentiment_data/train.csv', BATCH_SIZE, column_names=['sentiment', 'text'],
+            label_name='sentiment', header=True
+        )
 
-    # TODO: Add training for preprocessor, encoder
-    def train(self):
-        X, y = self.load_data()
+        train_ds = raw_train_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
-        input = self.preprocess(X)
-        pooled_output = self.encoder(input)["pooled_output"]
+        train_ds = train_ds.map(_map_func)
 
-        self.sentiment.fit(pooled_output, y, epochs=EPOCHS, batch_size=BATCH_SIZE)
+        for line in train_ds.take(1):
+            print(f"THE TYPE OF THE LABELS LIST: {type(line[1])}")
+            labels = []
+            for label in line[1]:
+                if label=='negative':
+                    label = -1
+                elif label=='neutral':
+                    label = 0
+                else: 
+                    label = 1
 
-        self.sentiment.save('./models/sentiment.h5')
+                label = tf.one_hot(
+                    label, 3, name='label', axis=-1
+                )
 
-    def load(self):
-        self.sentiment = tf.keras.models.load_model('./models/sentiment.h5')
+                labels.append(label)
 
-    def predict(self, data):
-        input = self.preprocess(data)
-        pooled_output = self.encoder(input)["pooled_output"]
+        classifier_model = model()
 
-        return self.sentiment.predict(pooled_output, batch_size=1)
-        
+        loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+        metrics = tf.metrics.BinaryAccuracy()
+
+        print(tf.data.experimental.cardinality(train_ds).numpy())
+
+        epochs = 5
+        steps_per_epoch = tf.data.experimental.cardinality(train_ds).numpy()
+        num_train_steps = steps_per_epoch * epochs
+        num_warmup_steps = int(0.1*num_train_steps)
+
+        init_lr = 3e-5
+        optimizer = optimization.create_optimizer(init_lr=init_lr,
+                                                  num_train_steps=num_train_steps,
+                                                  num_warmup_steps=num_warmup_steps,
+                                                  optimizer_type='adamw')
+
+        classifier_model.compile(optimizer=optimizer,
+                                 loss=loss,
+                                 metrics=metrics)
+
+        classifier_model.fit(x=train_ds,
+                             validation_data=train_ds.skip(3000),
+                             epochs=epochs)
+
+        classifier_model.save('./models/fin_sentiment_bert', include_optimizer=False)
+
 class Model:
     def __init__(self):
         self.model = tf.keras.models.Sequential()
@@ -99,6 +150,5 @@ class Model:
         sentiment_scores = []
         for tweet in tqdm(df_tweets['Tweets'].to_numpy()):
             sentiment_scores.append(bert.predict([tweet]))
-            print("Sentiment Score " + str(bert.predict([tweet])))
 
         df_tweets['sentiment'] = sentiment_scores

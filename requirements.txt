@@ -1,11 +1,14 @@
 tensorflow
 tensorflow_hub
 tensorflow_text
+tensorflow-datasets
+tf-models-official
+sklearn
 pandas
 numpy
 matplotlib
 coinbase
 pytrends
-sklearn
 tweepy
 tqdm
+transformers
