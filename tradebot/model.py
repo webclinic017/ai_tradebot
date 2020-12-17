@@ -14,6 +14,7 @@ from official.nlp import optimization
 tf.get_logger().setLevel('ERROR')
 
 BATCH_SIZE = 64
+EPOCHS = 10
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 KEYWORD_LIST = ["Blockchain", "Bitcoin", "Ethereum", "Cryptocurreny"]
@@ -31,22 +32,33 @@ TODO:
 
 class BERT:
     def load_data(self, data=None):
-        def _map_func(text, labels):
-            i=0
-            labels_enc = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-            for label in labels:
-                if label=='negative':
-                    label = tf.constant(-1)
-                elif label=='neutral':
-                    label = tf.constant(0)
-                else: 
-                    label = tf.constant(1)
+        def _preprocess(text, labels):
+            categories = tf.constant(['positive', 'neutral', 'negative'])
+            indices = tf.range(len(categories), dtype=tf.int64)
+            table_init = tf.lookup.KeyValueTensorInitializer(categories, indices)
+            num_oov_buckets = 1
+            table = tf.lookup.StaticVocabularyTable(table_init, num_oov_buckets)
 
-                label = tf.one_hot(
-                    label, 3, name='label', axis=-1)
+            cat_indices = table.lookup(labels)
+            labels_enc = tf.one_hot(cat_indices, depth=len(categories) + num_oov_buckets)
+            # i = tf.constant(0, name="Index")
+            # labels_enc = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+            # label = 0
+            # for i in tf.range(len(labels)):
+            #     if labels[i]=='negative':
+            #         label = -1
+            #     elif label[i]=='neutral':
+            #         label = 0
+            #     else: 
+            #         label = 1
 
-                labels_enc.write(i, label)
-                i = i+1
+            #     label = tf.one_hot(
+            #         label, 3, name='label', axis=-1)
+
+            #     labels_enc.write(i, label)
+            #     i = i+1
+
+            #     print(f"-----MAP FUNC-----\nINDEX: {i}\nLABEL: {label}\nLABELS LIST: {labels_enc}")
 
             return text, labels_enc
 
@@ -54,11 +66,14 @@ class BERT:
             text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text')
             preprocessing_layer = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_preprocess/2', name='preprocessing')
             encoder_inputs = preprocessing_layer(text_input)
-            encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/3', trainable=False, name='BERT_encoder')
+            encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/3', trainable=True, name='BERT_encoder')
             outputs = encoder(encoder_inputs)
             net = outputs['pooled_output']
             net = tf.keras.layers.Dropout(0.1)(net)
-            net = tf.keras.layers.Dense(3, activation='sigmoid', name='classifier')(net)
+            net = tf.keras.layers.Dense(64, activation="relu")(net)
+            net = tf.keras.layers.Dense(64, activation="relu")(net)
+            net = tf.keras.layers.Dropout(0.1)(net)
+            net = tf.keras.layers.Dense(4, activation='sigmoid', name='classifier')(net)
             return tf.keras.Model(text_input, net)
 
         raw_train_ds = tf.data.experimental.make_csv_dataset(
@@ -66,19 +81,21 @@ class BERT:
             label_name='sentiment', header=True
         )
 
-        train_ds = raw_train_ds.prefetch(buffer_size=AUTOTUNE)
+        train_ds = raw_train_ds # .prefetch(buffer_size=AUTOTUNE)
 
-        train_ds = train_ds.map(_map_func)
+        train_ds = train_ds.map(_preprocess)
+        train_ds.shuffle(2500).batch(BATCH_SIZE)
 
-        for line in train_ds.take(1):
-            print(f"THE LABELS LIST: {line[1]}")
+        # for line in train_ds.take(1):
+        #     print("-----AFTER MAP-----\n")
+        #     print(f"THE LINE: {line}\n")
+        #     print(f"THE TEXT LIST: {line[0]}\n")
+        #     print(f"THE LABELS LIST: {line[1]}")
 
         classifier_model = model()
 
         loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
-        metrics = tf.metrics.BinaryAccuracy()
-
-        print(f"DATA CARDINALITY: {tf.data.experimental.cardinality(train_ds).numpy()}")
+        metrics = tf.keras.metrics.CategoricalAccuracy()
 
         epochs = 5
         steps_per_epoch = tf.data.experimental.cardinality(train_ds).numpy()
@@ -95,9 +112,9 @@ class BERT:
                                  loss=loss,
                                  metrics=metrics)
 
-        classifier_model.fit(x=train_ds,
-                             validation_data=train_ds.skip(3000),
-                             epochs=10)
+        classifier_model.fit(x=train_ds.take(4000),
+                             validation_data=train_ds.skip(4000),
+                             epochs=EPOCHS)
 
         classifier_model.save('./models/fin_sentiment_bert', include_optimizer=False)
 
