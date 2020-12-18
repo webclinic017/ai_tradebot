@@ -3,7 +3,7 @@ tensorflow_hub
 tensorflow_text
 tensorflow-datasets
 tf-models-official
-sklearn
+tensorboard
 pandas
 numpy
 matplotlib
@@ -11,4 +11,3 @@ coinbase
 pytrends
 tweepy
 tqdm
-transformers
