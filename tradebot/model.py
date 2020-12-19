@@ -127,22 +127,23 @@ class BERT(Model):
         classifier_model = self.load_model(train=train)
 
         # Define Callbacks
-        tensorboard = tf.keras.callbacks.TensorBoard(
-            log_dir='./tensorboard/'+str(datetime.now().strftime("%Y%m%d-%H%M%S")), histogram_freq=1, write_graph=True,
-            update_freq='epoch', profile_batch=2,
-            embeddings_freq=0, embeddings_metadata=None,
-        )
-        early_stopping = tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss', min_delta=0, patience=1,
-            restore_best_weights=True
-        )
+        # tensorboard = tf.keras.callbacks.TensorBoard(
+        #     log_dir='./tensorboard/'+str(datetime.now().strftime("%Y%m%d-%H%M%S")), histogram_freq=1, write_graph=True,
+        #     update_freq='epoch', profile_batch=2,
+        #     embeddings_freq=0, embeddings_metadata=None,
+        # )
+        # early_stopping = tf.keras.callbacks.EarlyStopping(
+        #     monitor='val_loss', min_delta=0, patience=1,
+        #     restore_best_weights=True
+        # )
 
         # train model
         classifier_model.fit(x=train,
                             validation_data=val,
                             epochs=self.epochs,
                             use_multiprocessing=True,
-                            callbacks=[tensorboard, early_stopping])
+                            #callbacks=[tensorboard, early_stopping]
+                            )
 
         # save model
         classifier_model.save('./models/fin_sentiment_bert', include_optimizer=True)
