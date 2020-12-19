@@ -130,7 +130,7 @@ class FinancialSentimentDataset(tfds.core.GeneratorBasedBuilder):
 
         # And yield (key, feature_dict)
         yield i, {
-          'text': tf.constant(text, name='text'),
-          'score': label_enc[0]
+          'text': tf.constant(text, shape=(), name='text'),
+          'score': label_enc[0],
           # 'score': label_enc[0] if self.builder_config.name == 'one_hot' else label
         }

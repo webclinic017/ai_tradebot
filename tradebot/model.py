@@ -10,6 +10,7 @@ from pytrends.request import TrendReq
 from tradebot.news import Twitter_News
 from official.nlp import optimization
 from tqdm import tqdm
+from datetime import datetime
 
 # TODO: Add support for tpu
 
@@ -28,17 +29,11 @@ class BERT(Model):
     def load_data(self):
         """ Load the training data """
 
-        # builder = tfds.builder('financial_sentiment_dataset')
-        # builder.download_and_prepare()
-
-        train, test, val = tfds.load('financial_sentiment_dataset', split=['train[:80%]', 'train[80%:90%]', 'train[-10%:]'])
-
-        for line in train.take(1):
-            print(f"TRAIN DATASET: {line}")
+        train, test, val = tfds.load('financial_sentiment_dataset', split=['train[:80%]', 'train[80%:90%]', 'train[-10%:]'], batch_size=self.batch_size, as_supervised=True, shuffle_files=True)
 
         return train, test, val
 
-    def load_model(self, fresh=False):
+    def load_model(self, train=None, fresh=False):
         """ Create an instance of a sentiment analysis model
         
         Arguments:
@@ -51,13 +46,13 @@ class BERT(Model):
             def model():
                 """ Returns the sentiment analysis model """
                 # The input for the preprocessing layer - normal test
-                text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text')
+                text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text_input')
                 # Loading the preprocessing layer from keras
                 preprocessing_layer = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_preprocess/2', name='preprocessing')
                 # transforming the text to the shape the bert model expects
                 encoder_inputs = preprocessing_layer(text_input)
                 # bert model encoding the input text
-                encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/3', trainable=True, name='BERT_encoder')
+                encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/3', trainable=False, name='BERT_encoder')
                 # Input for classifier model
                 outputs = encoder(encoder_inputs)
 
@@ -79,9 +74,9 @@ class BERT(Model):
             loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
             metrics = tf.keras.metrics.CategoricalAccuracy()
 
-            steps_per_epoch = 75
+            steps_per_epoch = tf.data.experimental.cardinality(train)
             num_train_steps = steps_per_epoch * self.epochs
-            num_warmup_steps = int(0.1*num_train_steps)
+            num_warmup_steps = int(0.1*int(num_train_steps))
 
             init_lr = 3e-5
             # AdamW optimizer
@@ -104,11 +99,9 @@ class BERT(Model):
             loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
             metrics = tf.keras.metrics.CategoricalAccuracy()
 
-            print(f"DATASET CARDINALITY: {tf.data.experimental.cardinality(train)}")
-
-            steps_per_epoch = 75
+            steps_per_epoch = tf.data.experimental.cardinality(train)
             num_train_steps = steps_per_epoch * self.epochs
-            num_warmup_steps = int(0.1*num_train_steps)
+            num_warmup_steps = int(0.1*int(num_train_steps))
 
             init_lr = 3e-5
             # AdamW optimizer
@@ -131,11 +124,11 @@ class BERT(Model):
         if train == None or test == None or val == None:
             (train, test, val) = self.load_data()
         
-        classifier_model = self.load_model()
+        classifier_model = self.load_model(train=train)
 
         # Define Callbacks
         tensorboard = tf.keras.callbacks.TensorBoard(
-            log_dir='logs', histogram_freq=1, write_graph=True,
+            log_dir='./tensorboard/'+str(datetime.now().strftime("%Y%m%d-%H%M%S")), histogram_freq=1, write_graph=True,
             update_freq='epoch', profile_batch=2,
             embeddings_freq=0, embeddings_metadata=None,
         )
@@ -147,15 +140,14 @@ class BERT(Model):
         # train model
         classifier_model.fit(x=train,
                             validation_data=val,
-                            steps_per_epoch=75,
                             epochs=self.epochs,
                             use_multiprocessing=True,
                             callbacks=[tensorboard, early_stopping])
 
-        print(f"Model score: {classifier_model.evaluate(test)}")
-
         # save model
         classifier_model.save('./models/fin_sentiment_bert', include_optimizer=True)
+        
+        print(f"Model score: {classifier_model.evaluate(test)}")
 
     def predict(self, data):
         """ Use the sentiment analysis model to predict the sentiment for a new text """
