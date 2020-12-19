@@ -1,19 +1,21 @@
 import tensorflow as tf
 import tensorflow_hub as hub
 import tensorflow_text as text
+import tensorflow_datasets as tfds
+import data.sentiment_data.financial_sentiment_dataset
 import numpy as np
 import pandas as pd
 import os
 from pytrends.request import TrendReq
 from tradebot.news import Twitter_News
 from official.nlp import optimization
+from tqdm import tqdm
 
-# TODO: Add support for tpu and raspberry pi
+# TODO: Add support for tpu
 
 class Model:
     """ The base model class other models inherit from """
-    def __init__(self):
-        pass
+    pass
 
 class BERT(Model):
     """ Contains everything to load and train the sentiment analysis model """
@@ -26,33 +28,13 @@ class BERT(Model):
     def load_data(self):
         """ Load the training data """
 
-        def _preprocess(text, labels):
-            """ One Hot encode the labels in the Dataset """
-            # Create a tensorflow lookup table for the sentiment categories
-            categories = tf.constant(['positive', 'neutral', 'negative'])
-            indices = tf.range(len(categories), dtype=tf.int64)
-            table_init = tf.lookup.KeyValueTensorInitializer(categories, indices)
-            num_oov_buckets = 1
-            table = tf.lookup.StaticVocabularyTable(table_init, num_oov_buckets)
+        # builder = tfds.builder('financial_sentiment_dataset')
+        # builder.download_and_prepare()
 
-            # one hot encode labels of dataset
-            cat_indices = table.lookup(labels)
-            labels_enc = tf.one_hot(cat_indices, depth=len(categories) + num_oov_buckets)
+        train, test, val = tfds.load('financial_sentiment_dataset', split=['train[:80%]', 'train[80%:90%]', 'train[-10%:]'])
 
-            return text, labels_enc
-        
-        # Load dataset from csv file
-        dataset = tf.data.experimental.make_csv_dataset(
-            './data/sentiment_data/train.csv', self.batch_size, column_names=['sentiment', 'text'],
-            label_name='sentiment', header=True, shuffle=True
-        )
-
-        # Apply transformations specified in _preprocess function
-        dataset = dataset.map(_preprocess)
-
-        test = dataset.take(500)
-        val = dataset.skip(500).take(500)
-        test = dataset.skip(1000)
+        for line in train.take(1):
+            print(f"TRAIN DATASET: {line}")
 
         return train, test, val
 
@@ -96,9 +78,8 @@ class BERT(Model):
             # Define loss, metrics and callbacks for model
             loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
             metrics = tf.keras.metrics.CategoricalAccuracy()
-            callbacks = [tensorboard, early_stopping]
 
-            steps_per_epoch = tf.data.experimental.cardinality(train)
+            steps_per_epoch = 75
             num_train_steps = steps_per_epoch * self.epochs
             num_warmup_steps = int(0.1*num_train_steps)
 
@@ -111,7 +92,8 @@ class BERT(Model):
 
             classifier_model.compile(optimizer=optimizer,
                                     loss=loss,
-                                    metrics=metrics)
+                                    metrics=metrics,
+                                    experimental_steps_per_execution = 50)
 
             return classifier_model
         else:
@@ -122,7 +104,9 @@ class BERT(Model):
             loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
             metrics = tf.keras.metrics.CategoricalAccuracy()
 
-            steps_per_epoch = tf.data.experimental.cardinality(train)
+            print(f"DATASET CARDINALITY: {tf.data.experimental.cardinality(train)}")
+
+            steps_per_epoch = 75
             num_train_steps = steps_per_epoch * self.epochs
             num_warmup_steps = int(0.1*num_train_steps)
 
@@ -135,7 +119,8 @@ class BERT(Model):
 
             classifier_model.compile(optimizer=optimizer,
                                     loss=loss,
-                                    metrics=metrics)
+                                    metrics=metrics,
+                                    experimental_steps_per_execution = 50)
 
             return classifier_model
 
@@ -143,8 +128,8 @@ class BERT(Model):
         """ Train the sentiment analysis model """
 
         # if no training data is passed load data from dataset
-        if not train or not test or not val:
-            train, test, val = self.load_data()
+        if train == None or test == None or val == None:
+            (train, test, val) = self.load_data()
         
         classifier_model = self.load_model()
 
@@ -162,7 +147,7 @@ class BERT(Model):
         # train model
         classifier_model.fit(x=train,
                             validation_data=val,
-                            steps_per_epoch=tf.data.experimental.cardinality(train),
+                            steps_per_epoch=75,
                             epochs=self.epochs,
                             use_multiprocessing=True,
                             callbacks=[tensorboard, early_stopping])
@@ -188,27 +173,14 @@ class Prediction_Model(Model):
     def load_data(self):
         if not os.path.isfile('./data/financial_data/sentiment_per_day.csv'):
             bert = BERT()
-            tweets = news.Twitter_News().get_tweets(users=[
-                '@decryptmedia'
-                '@BTCTN'
-                '@CryptoBoomNews'
-                '@Cointelegraph'
-                '@aantonop'
-                '@VentureCoinist'
-                '@crypto'
-                '@ForbesCrypto'
-                '@FinancialNews'
-                '@IBDinvestors'
-                '@NDTVProfit'
-                '@FinancialXpress'
-                '@WSJCentralBanks'
-            ])
+            tweets = Twitter_News().get_tweets()
 
-            news = news.News_Headlines().get_news()
+            # tweets = news.News_Headlines().get_news()
             
             df = pd.DataFrame(columns=['date', 'tweet', 'sentiment'])
-
-            for tweet in tweets:
+            
+            print(f"PARSING TWEETS")
+            for tweet in tqdm(tweets):
                 df['date'] = tweet[0]
                 df['tweet'] = tweet[1]
                 sentiment = tf.argmax(bert.predict(tweet[1]), axis=0)
@@ -230,7 +202,8 @@ class Prediction_Model(Model):
             neutral = 0
             negative = 0
             total = 0
-            for tweet in df:
+            print("CREATE SENTIMENT PER DAY")
+            for tweet in tqdm(df):
                 sentiment = tweet[0]
 
                 if date == tweet[0]:
