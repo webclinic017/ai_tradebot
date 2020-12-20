@@ -149,5 +149,4 @@ dmypy.json
 
 _set_envs.pth
 logs/
-models/tf-hub-chache
-tensorboard
+tensorboard/**
