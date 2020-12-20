@@ -145,7 +145,7 @@ class BERT(Model):
                             callbacks=[early_stopping])
 
         # save model
-        classifier_model.save('./models/fin_sentiment_bert', include_optimizer=True, overwrite=True)
+        classifier_model.save('./models/fin_sentiment_bert', include_optimizer=False, overwrite=True)
         
         print(f"Model score: {classifier_model.evaluate(test)}")
 
