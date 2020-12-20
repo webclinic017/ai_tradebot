@@ -107,6 +107,11 @@ class FinancialSentimentDataset(tfds.core.GeneratorBasedBuilder):
   def _generate_examples(self, path):
     """Yields examples."""
     # TODO(financial_sentiment_dataset): Yields (key, example) tuples from the dataset
+    categories = tf.constant(['positive', 'neutral', 'negative'])
+    indices = tf.range(len(categories), dtype=tf.int64)
+    table_init = tf.lookup.KeyValueTensorInitializer(categories, indices)
+    num_oov_buckets = 1
+    table = tf.lookup.StaticVocabularyTable(table_init, num_oov_buckets)
 
     with open(path, encoding="ISO-8859-1") as f:
       for i, row in enumerate(csv.DictReader(f, fieldnames=['score', 'text'])):
@@ -117,12 +122,6 @@ class FinancialSentimentDataset(tfds.core.GeneratorBasedBuilder):
             score = value
           elif key == 'text':
             text = value
-
-        categories = tf.constant(['positive', 'neutral', 'negative'])
-        indices = tf.range(len(categories), dtype=tf.int64)
-        table_init = tf.lookup.KeyValueTensorInitializer(categories, indices)
-        num_oov_buckets = 1
-        table = tf.lookup.StaticVocabularyTable(table_init, num_oov_buckets)
 
         # one hot encode labels of dataset
         label = table.lookup(tf.constant(score))

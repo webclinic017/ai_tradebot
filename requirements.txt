@@ -4,6 +4,7 @@ tensorflow_text
 tensorflow-datasets
 tf-models-official
 tensorboard
+tensorboard_plugin_profile
 pandas
 numpy
 matplotlib

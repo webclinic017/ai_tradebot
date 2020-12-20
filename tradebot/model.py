@@ -52,7 +52,7 @@ class BERT(Model):
                 # transforming the text to the shape the bert model expects
                 encoder_inputs = preprocessing_layer(text_input)
                 # bert model encoding the input text
-                encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/3', trainable=False, name='BERT_encoder')
+                encoder = hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/3', trainable=True, name='BERT_encoder')
                 # Input for classifier model
                 outputs = encoder(encoder_inputs)
 
@@ -127,11 +127,11 @@ class BERT(Model):
         classifier_model = self.load_model(train=train)
 
         # Define Callbacks
-        # tensorboard = tf.keras.callbacks.TensorBoard(
-        #     log_dir='./tensorboard/'+str(datetime.now().strftime("%Y%m%d-%H%M%S")), histogram_freq=1, write_graph=True,
-        #     update_freq='epoch', profile_batch=2,
-        #     embeddings_freq=0, embeddings_metadata=None,
-        # )
+        tensorboard = tf.keras.callbacks.TensorBoard(
+            log_dir='./tensorboard/'+str(datetime.now().strftime("%Y%m%d-%H%M%S")), histogram_freq=1, write_graph=True,
+            update_freq='epoch', profile_batch='1,20',
+            embeddings_freq=0, embeddings_metadata=None,
+        )
         # early_stopping = tf.keras.callbacks.EarlyStopping(
         #     monitor='val_loss', min_delta=0, patience=1,
         #     restore_best_weights=True
@@ -142,11 +142,11 @@ class BERT(Model):
                             validation_data=val,
                             epochs=self.epochs,
                             use_multiprocessing=True,
-                            #callbacks=[tensorboard, early_stopping]
+                            callbacks=[tensorboard],
                             )
 
         # save model
-        classifier_model.save('./models/fin_sentiment_bert', include_optimizer=True)
+        classifier_model.save('./models/fin_sentiment_bert', include_optimizer=False)
         
         print(f"Model score: {classifier_model.evaluate(test)}")
 
