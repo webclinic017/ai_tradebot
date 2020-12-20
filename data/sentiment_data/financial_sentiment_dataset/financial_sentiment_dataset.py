@@ -125,7 +125,7 @@ class FinancialSentimentDataset(tfds.core.GeneratorBasedBuilder):
 
         # one hot encode labels of dataset
         label = table.lookup(tf.constant(score))
-        label_enc = tf.one_hot([label], depth=len(categories) + num_oov_buckets)
+        label_enc = tf.one_hot([label], depth=len(categories) + num_oov_buckets, dtype=tf.float32)
 
         # And yield (key, feature_dict)
         yield i, {

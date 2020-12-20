@@ -21,7 +21,7 @@ class Model:
 class BERT(Model):
     """ Contains everything to load and train the sentiment analysis model """
 
-    def __init__(self, batch_size=64, epochs=10, train_test_split=0.8):
+    def __init__(self, batch_size=32, epochs=10, train_test_split=0.8):
         self.batch_size = batch_size
         self.epochs = epochs
         self.train_test_split = train_test_split
@@ -85,10 +85,11 @@ class BERT(Model):
                                                     num_warmup_steps=num_warmup_steps,
                                                     optimizer_type='adamw')
 
+            # run_opts = tf.RunOptions(report_tensor_allocations_upon_oom = True)
+
             classifier_model.compile(optimizer=optimizer,
                                     loss=loss,
-                                    metrics=metrics,
-                                    experimental_steps_per_execution = 50)
+                                    metrics=metrics)
 
             return classifier_model
         else:
@@ -112,8 +113,7 @@ class BERT(Model):
 
             classifier_model.compile(optimizer=optimizer,
                                     loss=loss,
-                                    metrics=metrics,
-                                    experimental_steps_per_execution = 50)
+                                    metrics=metrics)
 
             return classifier_model
 
@@ -124,29 +124,28 @@ class BERT(Model):
         if train == None or test == None or val == None:
             (train, test, val) = self.load_data()
         
-        classifier_model = self.load_model(train=train)
+        classifier_model = self.load_model(train=train, fresh=True)
 
         # Define Callbacks
         tensorboard = tf.keras.callbacks.TensorBoard(
             log_dir='./tensorboard/'+str(datetime.now().strftime("%Y%m%d-%H%M%S")), histogram_freq=1, write_graph=True,
             update_freq='epoch', profile_batch='1,20',
-            embeddings_freq=0, embeddings_metadata=None,
+            embeddings_freq=1,
         )
-        # early_stopping = tf.keras.callbacks.EarlyStopping(
-        #     monitor='val_loss', min_delta=0, patience=1,
-        #     restore_best_weights=True
-        # )
+        early_stopping = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss', min_delta=0, patience=0,
+            restore_best_weights=False
+        )
 
         # train model
+        # TODO: Fix tensorboard error https://github.com/tensorflow/tensorflow/issues/43200
         classifier_model.fit(x=train,
                             validation_data=val,
                             epochs=self.epochs,
-                            use_multiprocessing=True,
-                            callbacks=[tensorboard],
-                            )
+                            callbacks=[early_stopping])
 
         # save model
-        classifier_model.save('./models/fin_sentiment_bert', include_optimizer=False)
+        classifier_model.save('./models/fin_sentiment_bert', include_optimizer=True, overwrite=True)
         
         print(f"Model score: {classifier_model.evaluate(test)}")
 
