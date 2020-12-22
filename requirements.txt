@@ -10,6 +10,7 @@ numpy
 matplotlib
 coinbase
 pytrends
+GoogleNews
 tweepy
 tqdm
 kaggle

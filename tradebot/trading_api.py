@@ -16,7 +16,10 @@ class Coinbase():
     def buy(self, amount, currency):
         return self.account.buy(amount=amount, currency=currency, payment_method=self.payment_method.id)
 
-    def sell(sell, amount, currency):
+    def sell(self, sell, amount, currency):
         return self.account.sell(amount=amount, currency=currency, payment_method=self.payment_method.id)
+
+    def get_price(self, date, currency):
+        return self.client.get_spot_price(currency_pair = f'{currency}-EUR', date=date)
 
 # API for buing shares

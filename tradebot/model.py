@@ -6,8 +6,7 @@ import data.sentiment_data.financial_sentiment_dataset
 import numpy as np
 import pandas as pd
 import os
-from pytrends.request import TrendReq
-from tradebot.news import Twitter_News
+from tradebot.news import Twitter_News, News_Headlines, Crypto_Prices, Google_Trends
 from official.nlp import optimization
 from tqdm import tqdm
 from datetime import datetime
@@ -74,7 +73,7 @@ class BERT(Model):
             loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
             metrics = tf.keras.metrics.CategoricalAccuracy()
 
-            steps_per_epoch = tf.data.experimental.cardinality(train)
+            steps_per_epoch = tf.data.experimental.cardinality(train) if fresh == None else 1
             num_train_steps = steps_per_epoch * self.epochs
             num_warmup_steps = int(0.1*int(num_train_steps))
 
@@ -84,8 +83,6 @@ class BERT(Model):
                                                     num_train_steps=num_train_steps,
                                                     num_warmup_steps=num_warmup_steps,
                                                     optimizer_type='adamw')
-
-            # run_opts = tf.RunOptions(report_tensor_allocations_upon_oom = True)
 
             classifier_model.compile(optimizer=optimizer,
                                     loss=loss,
@@ -100,7 +97,7 @@ class BERT(Model):
             loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
             metrics = tf.keras.metrics.CategoricalAccuracy()
 
-            steps_per_epoch = tf.data.experimental.cardinality(train)
+            steps_per_epoch = tf.data.experimental.cardinality(train) if fresh == None else 1
             num_train_steps = steps_per_epoch * self.epochs
             num_warmup_steps = int(0.1*int(num_train_steps))
 
@@ -154,7 +151,7 @@ class BERT(Model):
 
         # Load model and return sentiment for input text
         classifier_model = self.load_model()
-        return classifier_model.predict(x=data, batch_size=1)
+        return classifier_model.predict(x=data, verbose=1)
 
 class Prediction_Model(Model):
     def __init__(self, batch_size=64, epochs=10, train_test_split=0.8):
@@ -163,79 +160,83 @@ class Prediction_Model(Model):
         self.train_test_split = train_test_split
 
     def load_data(self):
-        if not os.path.isfile('./data/financial_data/sentiment_per_day.csv'):
-            bert = BERT()
-            tweets = Twitter_News().get_tweets()
+        # if not os.path.isfile('./data/financial_data/sentiment_per_day.csv'):
+        #     bert = BERT()
 
-            # tweets = news.News_Headlines().get_news()
-            
-            df = pd.DataFrame(columns=['date', 'tweet', 'sentiment'])
-            
-            print(f"PARSING TWEETS")
-            for tweet in tqdm(tweets):
-                df['date'] = tweet[0]
-                df['tweet'] = tweet[1]
-                sentiment = tf.argmax(bert.predict(tweet[1]), axis=0)
-                if sentiment == 0:
-                    df['sentiment'] = 'positive'
-                elif sentiment == 1:
-                    df['sentiment'] = 'neutral'
-                else:
-                    df['sentiment'] = 'negative'
+        #     predictions = bert.predict(tweets.to_numpy()[:, 1])
 
-            print(f"SENTIMENT PER TWEET: {df.head()}")
+        #     argmax = [tf.argmax(predictions[i]).numpy() for i in tf.range(len(predictions))]
 
-            df.to_csv('./data/financial_data/sentiment_per_tweet.csv')
+        #     for i in tf.range(len(argmax)):
+        #         if argmax[i] == 0:
+        #             argmax[i] = 'positive'
+        #         elif argmax[i] == 1:
+        #             argmax[i] = 'neutral'
+        #         elif argmax[i] == 2:
+        #             argmax[i] = 'negative'
+        #         else:
+        #             argmax[i] = 'other'
 
-            df_sentiment_day = pd.DataFrame(columns=['date', 'sentiment', 'total'])
+        #     tweets['sentiment'] = argmax
 
-            date = tweet[0]
-            positive = 0
-            neutral = 0
-            negative = 0
-            total = 0
-            print("CREATE SENTIMENT PER DAY")
-            for tweet in tqdm(df):
-                sentiment = tweet[0]
+        #     print(f"SENTIMENT PER TWEET: {tweets.head()}")
 
-                if date == tweet[0]:
-                    if sentiment == 'negative':
-                        negative = negative+1
-                    elif sentiment == 'neutral':
-                        neutral = neutral+1
-                    else:
-                        positive = positive+1
-                    
-                    total = total+1
-                else:
-                    df_sentiment_day['date'] = date
-                    df_sentiment_day['sentiment'] = [
-                        float(negative/total), float(neutral/total), float(positive/total)
-                    ]
-                    df_sentiment_day['total'] = total
-                    date = tweet[0]
+        #     tweets.to_csv('./data/financial_data/sentiment_per_tweet.csv', index=False)
 
-            print(f"SENTIMENT PER DAY: {df_sentiment_day.head()}")
+        #     # date, tweets, sentiment
+        #     tweets = pd.read_csv('./data/financial_data/sentiment_per_tweet.csv')
 
-            df_sentiment_day.to_csv('./data/financial_data/sentiment_per_day.csv')
+        #     date_list = []
+        #     positive = []
+        #     neutral = []
+        #     negative = []
+        #     other = []
 
-        if not os.path.isfile('./data/financial_data/trends_per_day.csv'):
-            pytrend = TrendReq()
-            pytrend.build_payload(kw_list=['Cryptocurrency', 'Blockchain', 'Bitcoin', 'Ethereum'])
+        #     date = tweets.to_numpy()[1][0]
+        #     positive_counter = 0
+        #     neutral_counter = 0
+        #     negative_counter = 0
+        #     other_counter = 0
+        #     i = 0
+        #     for tweet in tweets.to_numpy()[1:]:
+        #         if tweet[0] == date:
+        #             if tweet[2] == 'positive':
+        #                 positive_counter = positive_counter+1
+        #             elif tweet[2] == 'neutral':
+        #                 neutral_counter = neutral_counter+1
+        #             elif tweet[2] == 'negative':
+        #                 negative_counter = negative_counter+1
+        #             else:
+        #                 other_counter = other_counter+1
+        #         else:
+        #             date_list.append(date)
+        #             positive.append(positive_counter)
+        #             neutral.append(neutral_counter)
+        #             negative.append(negative_counter)
+        #             other.append(other_counter)
 
-            region = pytrend.interest_by_region()
-            trending = pytrend.trending_searches(pn='united_states')
-            today = pytrend.today_searches(pn='US')
-            related_queries = pytrend.related_queries()
+        #             positive_counter = 0
+        #             neutral_counter = 0
+        #             negative_counter = 0
+        #             other_counter = 0
+        #             date = tweet[0]
+        #             i = i+1
 
-            print(f"INTEREST BY REGION: \n{region.head()}\nTRENDING: \n{trending.head()}\nTODAY: \n{today.head()}\nRELATED QUERIES: \n{related_queries.head()}")
+        #     sentiment_per_day = pd.DataFrame(columns=['date', 'positive', 'neutral', 'negative', 'other'])
+        #     sentiment_per_day['date'] = date_list
+        #     sentiment_per_day['positive'] = positive
+        #     sentiment_per_day['neutral'] = neutral
+        #     sentiment_per_day['negative'] = negative
+        #     sentiment_per_day['other'] = other
 
-        dataset_historical_prices = tf.data.experimental.make_csv_dataset(
-            [
-                './data/financial_data/BTC-EUR.csv', 
-                './data/financial_data/ETH-EUR.csv',
-                './data/financial_data/sentiment_per_day.csv',
-                './data/financial_data/trends_per_day.csv'
-            ], 
-            self.batch_size, header=True, shuffle=True
-        )
+        #     print(sentiment_per_day.head())
+
+        #     sentiment_per_day.to_csv('./data/financial_data/sentiment_per_day.csv', index=False)
+
+        # tweets = Twitter_News().get_tweets()
+
+        # trends = Google_Trends().get_data()
+
+        # crypto_prices = Crypto_Prices().get_data()
+
+        news = News_Headlines().get_headlines()
