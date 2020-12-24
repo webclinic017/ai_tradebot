@@ -84,18 +84,14 @@ class Crypto_Prices():
             dates = pd.date_range('2015-12-13', '2020-12-13', freq='H')
             coinbase = Coinbase()
 
-            btc = []
-            eth = []
+            prices = []
             
-            for i, date in tqdm(dates):
+            for date in tqdm(dates):
                 price_btc = coinbase.get_price(date=str(date), currency='BTC')
                 price_eth = coinbase.get_price(date=str(date), currency='ETH')
-                btc.append([str(date), price_btc['amount']])
-                eth.append([str(date), price_eth['amount']])
+                prices.append([str(date), price_btc['amount'], price_eth['amount']])
 
-            df = pd.DataFrame(btc, columns=['date', 'btc'])
-            eth_df = pd.DataFrame(eth, columns=['date', 'eth']).drop('date', axis=1)
-            df['eth'] = eth_df['eth']
+            df = pd.DataFrame(prices, columns=['date', 'btc', 'eth'])
             df.to_csv('./data/financial_data/crypto_prices.csv', index=False)
             return df
         else:

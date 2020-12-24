@@ -9,6 +9,7 @@ pandas
 numpy
 matplotlib
 coinbase
+
 pytrends
 GoogleNews
 tweepy

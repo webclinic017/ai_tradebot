@@ -160,83 +160,33 @@ class Prediction_Model(Model):
         self.train_test_split = train_test_split
 
     def load_data(self):
-        # if not os.path.isfile('./data/financial_data/sentiment_per_day.csv'):
-        #     bert = BERT()
-
-        #     predictions = bert.predict(tweets.to_numpy()[:, 1])
-
-        #     argmax = [tf.argmax(predictions[i]).numpy() for i in tf.range(len(predictions))]
-
-        #     for i in tf.range(len(argmax)):
-        #         if argmax[i] == 0:
-        #             argmax[i] = 'positive'
-        #         elif argmax[i] == 1:
-        #             argmax[i] = 'neutral'
-        #         elif argmax[i] == 2:
-        #             argmax[i] = 'negative'
-        #         else:
-        #             argmax[i] = 'other'
-
-        #     tweets['sentiment'] = argmax
-
-        #     print(f"SENTIMENT PER TWEET: {tweets.head()}")
-
-        #     tweets.to_csv('./data/financial_data/sentiment_per_tweet.csv', index=False)
-
-        #     # date, tweets, sentiment
-        #     tweets = pd.read_csv('./data/financial_data/sentiment_per_tweet.csv')
-
-        #     date_list = []
-        #     positive = []
-        #     neutral = []
-        #     negative = []
-        #     other = []
-
-        #     date = tweets.to_numpy()[1][0]
-        #     positive_counter = 0
-        #     neutral_counter = 0
-        #     negative_counter = 0
-        #     other_counter = 0
-        #     i = 0
-        #     for tweet in tweets.to_numpy()[1:]:
-        #         if tweet[0] == date:
-        #             if tweet[2] == 'positive':
-        #                 positive_counter = positive_counter+1
-        #             elif tweet[2] == 'neutral':
-        #                 neutral_counter = neutral_counter+1
-        #             elif tweet[2] == 'negative':
-        #                 negative_counter = negative_counter+1
-        #             else:
-        #                 other_counter = other_counter+1
-        #         else:
-        #             date_list.append(date)
-        #             positive.append(positive_counter)
-        #             neutral.append(neutral_counter)
-        #             negative.append(negative_counter)
-        #             other.append(other_counter)
-
-        #             positive_counter = 0
-        #             neutral_counter = 0
-        #             negative_counter = 0
-        #             other_counter = 0
-        #             date = tweet[0]
-        #             i = i+1
-
-        #     sentiment_per_day = pd.DataFrame(columns=['date', 'positive', 'neutral', 'negative', 'other'])
-        #     sentiment_per_day['date'] = date_list
-        #     sentiment_per_day['positive'] = positive
-        #     sentiment_per_day['neutral'] = neutral
-        #     sentiment_per_day['negative'] = negative
-        #     sentiment_per_day['other'] = other
-
-        #     print(sentiment_per_day.head())
-
-        #     sentiment_per_day.to_csv('./data/financial_data/sentiment_per_day.csv', index=False)
-
-        # tweets = Twitter_News().get_tweets()
-
-        # trends = Google_Trends().get_data()
-
-        # crypto_prices = Crypto_Prices().get_data()
-
+        crypto_prices = Crypto_Prices().get_data()
+        trends = Google_Trends().get_data()
         news = News_Headlines().get_headlines()
+        tweets = Twitter_News().get_tweets()
+
+        bert = BERT()
+        tweets_sentiment = bert.predict(tweets.to_numpy()[:, 1])
+        news_sentiment = bert.predict(news.to_numpy()[:, 1])
+
+        tweets_sentiment = [tf.argmax(tweets_sentiment[i]).numpy() for i in tf.range(len(tweets_sentiment))]
+        news_sentiment = [tf.argmax(news_sentiment[i]).numpy() for i in tf.range(len(news_sentiment))]
+
+        tweets['sentiment'] = tweets_sentiment
+        news['sentiment'] = news_sentiment
+
+    def load_model(self):
+        def model():
+            net = tf.keras.layers.Input()
+            net = tf.keras.layers.LSTM(250)(net)
+            net = tf.keras.layers.LSTM(250)(net)
+            net = tf.keras.layers.Dropout(0.2)(net)
+            net = tf.keras.layers.LSTM(250)(net)
+            net = tf.keras.layers.LSTM(250)(net)
+            net = tf.keras.layers.Dropout(0.2)(net)
+
+    def train(self):
+        pass
+
+    def predict(self):
+        pass

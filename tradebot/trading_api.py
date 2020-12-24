@@ -1,4 +1,5 @@
 from coinbase.wallet.client import Client
+import alpaca_trade_api as tradeapi
 import os
 
 class Coinbase():
@@ -22,4 +23,6 @@ class Coinbase():
     def get_price(self, date, currency):
         return self.client.get_spot_price(currency_pair = f'{currency}-EUR', date=date)
 
-# API for buing shares
+class Alpaca():
+    def __init__(self):
+        self.api = tradeapi.REST('<key_id>', '<secret_key>', base_url='https://paper-api.alpaca.markets')
