@@ -8,8 +8,8 @@ tensorboard_plugin_profile
 pandas
 numpy
 matplotlib
+python-crontab
 coinbase
-
 pytrends
 GoogleNews
 tweepy

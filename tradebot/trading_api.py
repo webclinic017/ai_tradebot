@@ -1,6 +1,5 @@
-from coinbase.wallet.client import Client
-import alpaca_trade_api as tradeapi
 import os
+from coinbase.wallet.client import Client
 
 class Coinbase():
     def __init__(self):
@@ -11,18 +10,14 @@ class Coinbase():
         self.account = self.client.get_primary_account()
         self.payment_method = self.client.get_payment_methods()[0]
 
-    def get_current_price(self, currency):
-        return (self.client.get_buy_price(currency=currency), self.client.get_sell_price(currency=currency))
-
-    def buy(self, amount, currency):
-        return self.account.buy(amount=amount, currency=currency, payment_method=self.payment_method.id)
-
-    def sell(self, sell, amount, currency):
-        return self.account.sell(amount=amount, currency=currency, payment_method=self.payment_method.id)
-
     def get_price(self, date, currency):
         return self.client.get_spot_price(currency_pair = f'{currency}-EUR', date=date)
 
-class Alpaca():
-    def __init__(self):
-        self.api = tradeapi.REST('<key_id>', '<secret_key>', base_url='https://paper-api.alpaca.markets')
+    def get_portfolio(self):
+        pass
+
+    def buy(self, amount):
+        pass
+
+    def sell(self, amount):
+        pass

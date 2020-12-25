@@ -3,6 +3,7 @@ import tensorflow_hub as hub
 import tensorflow_text as text
 import tensorflow_datasets as tfds
 import data.sentiment_data.financial_sentiment_dataset
+import data.financial_data.bitcoin_prediction_dataset
 import numpy as np
 import pandas as pd
 import os
@@ -159,34 +160,112 @@ class Prediction_Model(Model):
         self.epochs = epochs
         self.train_test_split = train_test_split
 
-    def load_data(self):
-        crypto_prices = Crypto_Prices().get_data()
-        trends = Google_Trends().get_data()
-        news = News_Headlines().get_headlines()
-        tweets = Twitter_News().get_tweets()
+    def load_data(self, train=False, update=False):
+        """ loads the data for the time series prediction model
+        
+        args:
+        - train -> whether function should load training data or live data
+        - update -> if True will update the csv the tensorflow dataset is constructed from """
 
-        bert = BERT()
-        tweets_sentiment = bert.predict(tweets.to_numpy()[:, 1])
-        news_sentiment = bert.predict(news.to_numpy()[:, 1])
+        if train == False:
+            crypto_prices = Crypto_Prices().get_realtime_data()
+            trends = Google_Trends().get_realtime_data()
+            news = News_Headlines().get_realtime_data()
+            tweets = Twitter_News().get_realtime_data()
 
-        tweets_sentiment = [tf.argmax(tweets_sentiment[i]).numpy() for i in tf.range(len(tweets_sentiment))]
-        news_sentiment = [tf.argmax(news_sentiment[i]).numpy() for i in tf.range(len(news_sentiment))]
+            # TODO: construct dataset with from tensor slices
+            dataset = tf.data.Dataset.from_tensor_slices()
 
-        tweets['sentiment'] = tweets_sentiment
-        news['sentiment'] = news_sentiment
+            return data
 
-    def load_model(self):
-        def model():
-            net = tf.keras.layers.Input()
-            net = tf.keras.layers.LSTM(250)(net)
-            net = tf.keras.layers.LSTM(250)(net)
-            net = tf.keras.layers.Dropout(0.2)(net)
-            net = tf.keras.layers.LSTM(250)(net)
-            net = tf.keras.layers.LSTM(250)(net)
-            net = tf.keras.layers.Dropout(0.2)(net)
+        if update == True:
+            # Construct new csv for tfds with more data
+            crypto_prices = Crypto_Prices().get_training_data()
+            trends = Google_Trends().get_training_data()
+            news = News_Headlines().get_training_data()
+            tweets = Twitter_News().get_training_data()
 
-    def train(self):
-        pass
+            bert = BERT()
+            tweets_sentiment = bert.predict(tweets.to_numpy()[:10, 1])
+            news_sentiment = bert.predict(news.to_numpy()[:10, 1])
 
-    def predict(self):
-        pass
+            tweets.loc[10]['sentiment'] = [tf.argmax(tweets_sentiment[i]).numpy() for i in tf.range(len(tweets_sentiment))]
+            news.loc[10]['sentiment'] = [tf.argmax(news_sentiment[i]).numpy() for i in tf.range(len(news_sentiment))]
+
+            sentiment = tweets.merge(news, on='date', sort=True)
+
+            print(sentiment.head())
+
+            # date = sentiment.to_numpy()[0][0]
+            # for line in sentiment.to_numpy():
+
+
+            # final dataframe = 'date', 'btc', 'btc_volatility', 'btc_volume', 'btc_velocity', 'eth', 'eth_volatility', 'eth_volume', 'eth_velocity', 'trends', 'sentiment'
+            df = pd.DataFrame(crypto_prices)
+            df['trends_btc'] = trends['Bitcoin'].to_numpy()[:43849]
+            df['trends_eth'] = trends['Ethereum'].to_numpy()[:43849]
+            df['trends_total'] = [i[0] + i[1] + i[2] + i[3] + i[4] for i in trends.to_numpy()[:43849]]
+            df['sentiment'] = sentiment
+            # print(df.head())
+
+            df.to_csv('./data/financial_data/price_prediction_dataset.csv')
+            
+        train, test, val = tfds.load('bitcoin_prediction_dataset', split=['train[:80%]', 'train[80%:90%]', 'train[-10%:]'], batch_size=self.batch_size, as_supervised=True, shuffle_files=True)
+
+        return train, test, val
+
+    def load_model(self, fresh=False):
+
+        if not os.path.exists('./models/fin_timeseries_model') or fresh == True:
+            # TODO: Research on best time series network and implement
+            def model():
+                net = tf.keras.layers.Input()
+                net = tf.keras.layers.LSTM(250)(net)
+                net = tf.keras.layers.LSTM(250)(net)
+                net = tf.keras.layers.Dropout(0.2)(net)
+                net = tf.keras.layers.LSTM(250)(net)
+                net = tf.keras.layers.LSTM(250)(net)
+                net = tf.keras.layers.Dropout(0.2)(net)
+                return tf.keras.Model(input, net)
+
+            model = model()
+
+            model.compile(
+                optimizer=tf.keras.optimizers.Adam(lr=1e-4), 
+                loss=tf.keras.losses.MSE(), 
+                metrics=['acc'])
+
+            return model
+        else:
+            model = tf.kers.models.load_model('./models/fin_timeseries_model')
+
+            model.compile(
+                optimizer=tf.keras.optimizers.Adam(lr=1e-4), 
+                loss=tf.keras.losses.MSE(), 
+                metrics=['acc'])
+
+            return model
+
+    def train(self, train=None, test=None, val=None):
+        if train == None or test == None or val == None:
+            (train, test, val) = self.load_data(train=True)
+
+        model = self.load_model()
+
+        tensorboard = tf.keras.callbacks.TensorBoard(log_dir=f"./tensorboard/pred/{datetime.now()}")
+        early_stopping = tf.keras.callbacks.EarlyStopping()
+
+        model.fit(
+            x=train,
+            validation_data=val,
+            epochs=epochs,
+            callbacks=[tensorboard, early_stopping]
+        )
+
+        model.save('./models/fin_timeseries_model', include_optimizer=False, overwrite=True)
+
+        print(f"Model score: {model.evaluate(test)}")
+
+    def predict(self, data):
+        model = self.load_model()
+        model.predict(x=data, verbose=1)
