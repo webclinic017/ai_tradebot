@@ -3,7 +3,7 @@ import tensorflow_hub as hub
 import tensorflow_text as text
 import tensorflow_datasets as tfds
 import data.sentiment_data.financial_sentiment_dataset
-# import data.financial_data.bitcoin_prediction_dataset
+import data.financial_data.bitcoin_prediction_dataset
 import numpy as np
 import pandas as pd
 import os
@@ -238,9 +238,9 @@ class Prediction_Model(Model):
 
             df.to_csv('./data/financial_data/price_prediction_dataset.csv', index=False)
             
-        # train, test, val = tfds.load('bitcoin_prediction_dataset', split=['train[:80%]', 'train[80%:90%]', 'train[-10%:]'], batch_size=self.batch_size, as_supervised=True, shuffle_files=True)
+        train, test, val = tfds.load('bitcoin_prediction_dataset', split=['train[:80%]', 'train[80%:90%]', 'train[-10%:]'], batch_size=self.batch_size, shuffle_files=True)
 
-        # return train, test, val
+        return train, test, val
 
     def load_model(self, fresh=False):
 
