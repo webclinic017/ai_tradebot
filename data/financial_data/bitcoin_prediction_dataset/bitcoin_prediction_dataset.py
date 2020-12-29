@@ -30,7 +30,16 @@ class BitcoinPredictionDataset(tfds.core.GeneratorBasedBuilder):
       builder=self,
       description=_DESCRIPTION,
       features=tfds.features.FeaturesDict({
-          # These are the features of your dataset like images, labels ...
+          'date': tfds.features.Tensor(shape=(), dtype=tf.string),
+          'btc': tfds.features.Tensor(shape=(), dtype=tf.int32),
+          'eth': tfds.features.Tensor(shape=(), dtype=tf.int32),
+          'trends_btc': tfds.features.Tensor(shape=(), dtype=tf.int32),
+          'trends_eth': tfds.features.Tensor(shape=(), dtype=tf.int32),
+          'trends_total': tfds.features.Tensor(shape=(), dtype=tf.int32),
+          'negative': tfds.features.Tensor(shape=(), dtype=tf.int32),
+          'neutral': tfds.features.Tensor(shape=(), dtype=tf.int32),
+          'other': tfds.features.Tensor(shape=(), dtype=tf.int32),
+          'positive': tfds.features.Tensor(shape=(), dtype=tf.int32),
       }),
       # If there's a common (input, target) tuple from the
       # features, specify them here. They'll be used if
@@ -43,7 +52,7 @@ class BitcoinPredictionDataset(tfds.core.GeneratorBasedBuilder):
   def _split_generators(self, dl_manager: tfds.download.DownloadManager):
     """Returns SplitGenerators."""
     # TODO(bitcoin_prediction_dataset): Downloads the data and defines the splits
-    path = dl_manager.download('https://todo-data-url')
+    path = dl_manager.download('https://github.com/johann-su/ai_tradebot/blob/main/data/financial_data/price_prediction_dataset.csv.csv)
 
     # TODO(bitcoin_prediction_dataset): Returns the Dict[split names, Iterator[Key, Example]]
     return {

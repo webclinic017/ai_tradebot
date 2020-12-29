@@ -1,4 +1,4 @@
-from .runner import MainThread
+# from .runner import MainThread
 
-if __name__ == '__main__':
-    MainThread()
+# if __name__ == '__main__':
+#     MainThread()

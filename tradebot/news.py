@@ -71,7 +71,7 @@ class News_Headlines():
 
         # check if data has been downloaded
         if not os.path.isfile('./data/sentiment_data/headlines.csv'):
-            googlenews = GoogleNews(lang='en', start='01/01/2015',end='12/01/2020') # mm/dd/yyyy
+            googlenews = GoogleNews(lang='en', start='01/01/2015') # mm/dd/yyyy
 
             news = []
 
@@ -112,7 +112,7 @@ class Crypto_Prices():
         # check if data has been downloaded
         if not os.path.isfile('./data/financial_data/crypto_prices.csv'):
             # create a pandas dataframe with dates from last five years
-            dates = pd.date_range('2015-12-13', '2020-12-13', freq='H')
+            dates = pd.date_range('2015-12-13', datetime.now().strftime('%Y-%m-%d %H:%M%S'), freq='H')
             coinbase = Coinbase()
 
             prices = []
@@ -150,10 +150,10 @@ class Google_Trends():
                 month_start=1,
                 day_start=1,
                 hour_start=0,
-                year_end=2020,
-                month_end=12,
-                day_end=22,
-                hour_end=0,
+                year_end=datetime.now().strftime('%Y'),
+                month_end=datetime.now().strftime('%m'),
+                day_end=datetime.now().strftime('%d'),
+                hour_end=datetime.now().strftime('%H'),
             )
 
             # make dataframe with trends and save to csv

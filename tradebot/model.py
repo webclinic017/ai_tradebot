@@ -3,7 +3,7 @@ import tensorflow_hub as hub
 import tensorflow_text as text
 import tensorflow_datasets as tfds
 import data.sentiment_data.financial_sentiment_dataset
-import data.financial_data.bitcoin_prediction_dataset
+# import data.financial_data.bitcoin_prediction_dataset
 import numpy as np
 import pandas as pd
 import os
@@ -185,41 +185,69 @@ class Prediction_Model(Model):
             news = News_Headlines().get_training_data()
             tweets = Twitter_News().get_training_data()
 
-            bert = BERT()
-            tweets_sentiment = bert.predict(tweets.to_numpy()[:10, 1])
-            news_sentiment = bert.predict(news.to_numpy()[:10, 1])
+            if not os.path.isfile('./data/sentiment_data/tweets_sentiment.csv'):
+                bert = BERT()
+                tweets_sentiment = bert.predict(tweets.to_numpy()[:, 1])
+                news_sentiment = bert.predict(news.to_numpy()[:, 1])
 
-            tweets.loc[10]['sentiment'] = [tf.argmax(tweets_sentiment[i]).numpy() for i in tf.range(len(tweets_sentiment))]
-            news.loc[10]['sentiment'] = [tf.argmax(news_sentiment[i]).numpy() for i in tf.range(len(news_sentiment))]
+                tweets['sentiment'] = [tf.argmax(tweets_sentiment[i]).numpy() for i in tf.range(len(tweets_sentiment))]
+                news['sentiment'] = [tf.argmax(news_sentiment[i]).numpy() for i in tf.range(len(news_sentiment))]
 
-            sentiment = tweets.merge(news, on='date', sort=True)
+                tweets.to_csv('./data/sentiment_data/tweets_sentiment.csv', index=False)
+                news.to_csv('./data/sentiment_data/news_sentiment.csv', index=False)
 
-            print(sentiment.head())
+            tweets = pd.read_csv('./data/sentiment_data/tweets_sentiment.csv')
+            news = pd.read_csv('./data/sentiment_data/news_sentiment.csv')
 
-            # date = sentiment.to_numpy()[0][0]
-            # for line in sentiment.to_numpy():
+            tweets['date'] = pd.to_datetime(tweets['date'])
+            tweets = tweets.sort_values('date')
+            news['date'] = pd.to_datetime(news['date'])
+            news = news.sort_values('date')
 
+            df = pd.merge(tweets, news, on='date', how='outer')
 
-            # final dataframe = 'date', 'btc', 'btc_volatility', 'btc_volume', 'btc_velocity', 'eth', 'eth_volatility', 'eth_volume', 'eth_velocity', 'trends', 'sentiment'
+            sentiment_per_day = pd.DataFrame()
+
+            prev_day = 0
+            for date in df['date']:
+                if date != prev_day:
+                    if pd.isnull(date):
+                        continue
+                    df_day = df.loc[df['date'] == date]
+
+                    # positive = 0, neutral = 1, negative = 2, other = 3
+                    positive_per_day = df_day['sentiment_x'].value_counts().get(0, 0) + df_day['sentiment_y'].value_counts().get(0, 0)
+                    neutral_per_day = df_day['sentiment_x'].value_counts().get(1, 0) + df_day['sentiment_y'].value_counts().get(1, 0)
+                    negative_per_day = df_day['sentiment_x'].value_counts().get(2, 0) + df_day['sentiment_y'].value_counts().get(2, 0)
+                    other_per_day = df_day['sentiment_x'].value_counts().get(3, 0) + df_day['sentiment_y'].value_counts().get(3, 0)
+
+                    sentiment_per_day = sentiment_per_day.append({'date': date, 'positive': positive_per_day, 'neutral': neutral_per_day, 'negative': negative_per_day, 'other': other_per_day}, ignore_index=True)
+
+                    prev_day = date
+
             df = pd.DataFrame(crypto_prices)
             df['trends_btc'] = trends['Bitcoin'].to_numpy()[:43849]
             df['trends_eth'] = trends['Ethereum'].to_numpy()[:43849]
             df['trends_total'] = [i[0] + i[1] + i[2] + i[3] + i[4] for i in trends.to_numpy()[:43849]]
-            df['sentiment'] = sentiment
-            # print(df.head())
 
-            df.to_csv('./data/financial_data/price_prediction_dataset.csv')
+            df['date'] = pd.to_datetime(df['date'])
+            df = pd.merge(df, sentiment_per_day, how='outer', on='date')
+            df.fillna(0, inplace=True)
+
+            print(df.head())
+
+            df.to_csv('./data/financial_data/price_prediction_dataset.csv', index=False)
             
-        train, test, val = tfds.load('bitcoin_prediction_dataset', split=['train[:80%]', 'train[80%:90%]', 'train[-10%:]'], batch_size=self.batch_size, as_supervised=True, shuffle_files=True)
+        # train, test, val = tfds.load('bitcoin_prediction_dataset', split=['train[:80%]', 'train[80%:90%]', 'train[-10%:]'], batch_size=self.batch_size, as_supervised=True, shuffle_files=True)
 
-        return train, test, val
+        # return train, test, val
 
     def load_model(self, fresh=False):
 
         if not os.path.exists('./models/fin_timeseries_model') or fresh == True:
             # TODO: Research on best time series network and implement
             def model():
-                net = tf.keras.layers.Input()
+                net = tf.keras.layers.Input(shape=(2, 5))
                 net = tf.keras.layers.LSTM(250)(net)
                 net = tf.keras.layers.LSTM(250)(net)
                 net = tf.keras.layers.Dropout(0.2)(net)
