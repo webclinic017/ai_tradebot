@@ -32,7 +32,7 @@ GoogleNews==1.5.1
 grpcio==1.32.0
 gviz-api==1.9.0
 h5py==2.10.0
-httplib2==0.18.1
+httplib2==0.19.0
 idna==2.10
 importlib-metadata==3.3.0
 importlib-resources==4.1.0
